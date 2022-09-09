@@ -109,7 +109,7 @@
     if (!self.filterText.length) {
         self.metadata = self.allMetadata;
     } else {
-        self.metadata = [self.allMetadata flex_filtered:^BOOL(FLEXProperty *obj, NSUInteger idx) {
+        self.metadata = [self.allMetadata flex_filtered:^BOOL(id<FLEXRuntimeMetadata> obj, NSUInteger idx) {
             return [obj.description localizedCaseInsensitiveContainsString:self.filterText];
         }];
     }
@@ -189,8 +189,6 @@
     cell.accessoryType = [self accessoryTypeForRow:row];
 }
 
-#if FLEX_AT_LEAST_IOS13_SDK
-
 - (NSString *)menuSubtitleForRow:(NSInteger)row {
     return [self.metadata[row] contextualSubtitleWithTarget:self.explorer.object];
 }
@@ -231,7 +229,5 @@
 - (NSArray<NSString *> *)copyMenuItemsForRow:(NSInteger)row {
     return [self.metadata[row] copiableMetadataWithTarget:self.explorer.object];
 }
-
-#endif
 
 @end

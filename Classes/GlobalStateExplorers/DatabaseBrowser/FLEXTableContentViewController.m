@@ -7,15 +7,22 @@
 //
 
 #import "FLEXTableContentViewController.h"
+#import "FLEXTableRowDataViewController.h"
 #import "FLEXMultiColumnTableView.h"
 #import "FLEXWebViewController.h"
 #import "FLEXUtility.h"
+#import "UIBarButtonItem+FLEX.h"
 
 @interface FLEXTableContentViewController () <
     FLEXMultiColumnTableViewDataSource, FLEXMultiColumnTableViewDelegate
 >
 @property (nonatomic, readonly) NSArray<NSString *> *columns;
-@property (nonatomic, copy) NSArray<NSArray *> *rows;
+@property (nonatomic) NSMutableArray<NSArray *> *rows;
+@property (nonatomic, readonly) NSString *tableName;
+@property (nonatomic, nullable) NSMutableArray<NSString *> *rowIDs;
+@property (nonatomic, readonly, nullable) id<FLEXDatabaseManager> databaseManager;
+
+@property (nonatomic, readonly) BOOL canRefresh;
 
 @property (nonatomic) FLEXMultiColumnTableView *multiColumnView;
 @end
@@ -23,11 +30,44 @@
 @implementation FLEXTableContentViewController
 
 + (instancetype)columns:(NSArray<NSString *> *)columnNames
+                   rows:(NSArray<NSArray<NSString *> *> *)rowData
+                 rowIDs:(NSArray<NSString *> *)rowIDs
+              tableName:(NSString *)tableName
+               database:(id<FLEXDatabaseManager>)databaseManager {
+    return [[self alloc]
+        initWithColumns:columnNames
+        rows:rowData
+        rowIDs:rowIDs
+        tableName:tableName
+        database:databaseManager
+    ];
+}
+
++ (instancetype)columns:(NSArray<NSString *> *)cols
                    rows:(NSArray<NSArray<NSString *> *> *)rowData {
-    FLEXTableContentViewController *controller = [self new];
-    controller->_columns = columnNames;
-    controller->_rows = rowData;
-    return controller;
+    return [[self alloc] initWithColumns:cols rows:rowData rowIDs:nil tableName:nil database:nil];
+}
+
+- (instancetype)initWithColumns:(NSArray<NSString *> *)columnNames
+                           rows:(NSArray<NSArray<NSString *> *> *)rowData
+                         rowIDs:(nullable NSArray<NSString *> *)rowIDs
+                      tableName:(nullable NSString *)tableName
+                       database:(nullable id<FLEXDatabaseManager>)databaseManager {
+    // Must supply all optional parameters as one, or none
+    BOOL all = rowIDs && tableName && databaseManager;
+    BOOL none = !rowIDs && !tableName && !databaseManager;
+    NSParameterAssert(all || none);
+
+    self = [super init];
+    if (self) {
+        self->_columns = columnNames.copy;
+        self->_rows = rowData.mutableCopy;
+        self->_rowIDs = rowIDs.mutableCopy;
+        self->_tableName = tableName.copy;
+        self->_databaseManager = databaseManager;
+    }
+
+    return self;
 }
 
 - (void)loadView {
@@ -38,9 +78,9 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    
-    self.edgesForExtendedLayout = UIRectEdgeNone;
+    self.title = self.tableName;
     [self.multiColumnView reloadData];
+    [self setupToolbarItems];
 }
 
 - (FLEXMultiColumnTableView *)multiColumnView {
@@ -54,6 +94,10 @@
     }
     
     return _multiColumnView;
+}
+
+- (BOOL)canRefresh {
+    return self.databaseManager && self.tableName;
 }
 
 #pragma mark MultiColumnTableView DataSource
@@ -111,6 +155,10 @@
         return [NSString stringWithFormat:@"%@:\n%@", self.columns[idx], field];
     }];
     
+    NSArray<NSString *> *values = [self.rows[row] flex_mapped:^id(NSString *value, NSUInteger idx) {
+        return [NSString stringWithFormat:@"'%@'", value];
+    }];
+    
     [FLEXAlert makeAlert:^(FLEXAlert *make) {
         make.title([@"Row " stringByAppendingString:@(row).stringValue]);
         NSString *message = [fields componentsJoinedByString:@"\n\n"];
@@ -118,6 +166,34 @@
         make.button(@"Copy").handler(^(NSArray<NSString *> *strings) {
             UIPasteboard.generalPasteboard.string = message;
         });
+        make.button(@"Copy as CSV").handler(^(NSArray<NSString *> *strings) {
+            UIPasteboard.generalPasteboard.string = [values componentsJoinedByString:@", "];
+        });
+        make.button(@"Focus on Row").handler(^(NSArray<NSString *> *strings) {
+            UIViewController *focusedRow = [FLEXTableRowDataViewController
+                rows:[NSDictionary dictionaryWithObjects:self.rows[row] forKeys:self.columns]
+            ];
+            [self.navigationController pushViewController:focusedRow animated:YES];
+        });
+        
+        // Option to delete row
+        BOOL hasRowID = self.rows.count && row < self.rows.count;
+        if (hasRowID && self.canRefresh) {
+            make.button(@"Delete").destructiveStyle().handler(^(NSArray<NSString *> *strings) {
+                NSString *deleteRow = [NSString stringWithFormat:
+                    @"DELETE FROM %@ WHERE rowid = %@",
+                    self.tableName, self.rowIDs[row]
+                ];
+                
+                [self executeStatementAndShowResult:deleteRow completion:^(BOOL success) {
+                    // Remove deleted row and reload view
+                    if (success) {
+                        [self reloadTableDataFromDB];
+                    }
+                }];
+            });
+        }
+        
         make.button(@"Dismiss").cancelStyle();
     } showFrom:self];
 }
@@ -154,12 +230,11 @@
         sortContentData = sortContentData.reverseObjectEnumerator.allObjects.copy;
     }
     
-    self.rows = sortContentData;
+    self.rows = sortContentData.mutableCopy;
     [self.multiColumnView reloadData];
 }
 
-#pragma mark -
-#pragma mark About Transition
+#pragma mark - About Transition
 
 - (void)willTransitionToTraitCollection:(UITraitCollection *)newCollection
               withTransitionCoordinator:(id <UIViewControllerTransitionCoordinator>)coordinator {
@@ -175,6 +250,110 @@
         
         [self.view setNeedsLayout];
     } completion:nil];
+}
+
+#pragma mark - Toolbar
+
+- (void)setupToolbarItems {
+    // We do not support modifying realm databases
+    if (![self.databaseManager respondsToSelector:@selector(executeStatement:)]) {
+        return;
+    }
+    
+    UIBarButtonItem *trashButton = FLEXBarButtonItemSystem(Trash, self, @selector(trashPressed));
+    UIBarButtonItem *addButton = FLEXBarButtonItemSystem(Add, self, @selector(addPressed));
+
+    // Only allow adding rows or deleting rows if we have a table name
+    trashButton.enabled = self.canRefresh;
+    addButton.enabled = self.canRefresh;
+    
+    self.toolbarItems = @[
+        UIBarButtonItem.flex_flexibleSpace,
+        addButton,
+        UIBarButtonItem.flex_flexibleSpace,
+        [trashButton flex_withTintColor:UIColor.redColor],
+    ];
+}
+
+- (void)trashPressed {
+    NSParameterAssert(self.tableName);
+
+    [FLEXAlert makeAlert:^(FLEXAlert *make) {
+        make.title(@"Delete All Rows");
+        make.message(@"All rows in this table will be permanently deleted.\nDo you want to proceed?");
+        
+        make.button(@"Yes, I'm sure").destructiveStyle().handler(^(NSArray<NSString *> *strings) {
+            NSString *deleteAll = [NSString stringWithFormat:@"DELETE FROM %@", self.tableName];
+            [self executeStatementAndShowResult:deleteAll completion:^(BOOL success) {
+                // Only dismiss on success
+                if (success) {
+                    [self.navigationController popViewControllerAnimated:YES];
+                }
+            }];
+        });
+        make.button(@"Cancel").cancelStyle();
+    } showFrom:self];
+}
+
+- (void)addPressed {
+    NSParameterAssert(self.tableName);
+
+    [FLEXAlert makeAlert:^(FLEXAlert *make) {
+        make.title(@"Add a New Row");
+        make.message(@"Comma separate values to use in an INSERT statement.\n\n");
+        make.message(@"INSERT INTO [table] VALUES (your_input)");
+        make.textField(@"5, 'John Smith', 14,...");
+        make.button(@"Insert").handler(^(NSArray<NSString *> *strings) {
+            NSString *statement = [NSString stringWithFormat:
+                @"INSERT INTO %@ VALUES (%@)", self.tableName, strings[0]
+            ];
+
+            [self executeStatementAndShowResult:statement completion:^(BOOL success) {
+                if (success) {
+                    [self reloadTableDataFromDB];
+                }
+            }];
+        });
+        make.button(@"Cancel").cancelStyle();
+    } showFrom:self];
+}
+
+#pragma mark - Helpers
+
+- (void)executeStatementAndShowResult:(NSString *)statement
+                           completion:(void (^_Nullable)(BOOL success))completion {
+    NSParameterAssert(self.databaseManager);
+
+    FLEXSQLResult *result = [self.databaseManager executeStatement:statement];
+    
+    [FLEXAlert makeAlert:^(FLEXAlert *make) {
+        if (result.isError) {
+            make.title(@"Error");
+        }
+        
+        make.message(result.message ?: @"<no output>");
+        make.button(@"Dismiss").cancelStyle().handler(^(NSArray<NSString *> *_) {
+            if (completion) {
+                completion(!result.isError);
+            }
+        });
+    } showFrom:self];
+}
+
+- (void)reloadTableDataFromDB {
+    if (!self.canRefresh) {
+        return;
+    }
+
+    NSArray<NSArray *> *rows = [self.databaseManager queryAllDataInTable:self.tableName];
+    NSArray<NSString *> *rowIDs = nil;
+    if ([self.databaseManager respondsToSelector:@selector(queryRowIDsInTable:)]) {
+        rowIDs = [self.databaseManager queryRowIDsInTable:self.tableName];
+    }
+
+    self.rows = rows.mutableCopy;
+    self.rowIDs = rowIDs.mutableCopy;
+    [self.multiColumnView reloadData];
 }
 
 @end

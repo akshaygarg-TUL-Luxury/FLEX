@@ -50,15 +50,12 @@ CGFloat const kFLEXDebounceForExpensiveIO = 0.5;
 #pragma mark - Initialization
 
 - (id)init {
-#if FLEX_AT_LEAST_IOS13_SDK
     if (@available(iOS 13.0, *)) {
         self = [self initWithStyle:UITableViewStyleInsetGrouped];
     } else {
         self = [self initWithStyle:UITableViewStyleGrouped];
     }
-#else
-    self = [self initWithStyle:UITableViewStyleGrouped];
-#endif
+    
     return self;
 }
 
@@ -69,9 +66,9 @@ CGFloat const kFLEXDebounceForExpensiveIO = 0.5;
         _searchBarDebounceInterval = kFLEXDebounceFast;
         _showSearchBarInitially = YES;
         _style = style;
-        _manuallyDeactivateSearchOnDisappear = ({
-            NSProcessInfo.processInfo.operatingSystemVersion.majorVersion < 11;
-        });
+        _manuallyDeactivateSearchOnDisappear = (
+            NSProcessInfo.processInfo.operatingSystemVersion.majorVersion < 11
+        );
         
         // We will be our own search delegate if we implement this method
         if ([self respondsToSelector:@selector(updateSearchResults:)]) {
@@ -106,11 +103,9 @@ CGFloat const kFLEXDebounceForExpensiveIO = 0.5;
 
         self.automaticallyShowsSearchBarCancelButton = YES;
 
-        #if FLEX_AT_LEAST_IOS13_SDK
         if (@available(iOS 13, *)) {
             self.searchController.automaticallyShowsScopeBar = NO;
         }
-        #endif
         
         [self addSearchController:self.searchController];
     } else {
@@ -170,21 +165,17 @@ CGFloat const kFLEXDebounceForExpensiveIO = 0.5;
 }
 
 - (BOOL)automaticallyShowsSearchBarCancelButton {
-#if FLEX_AT_LEAST_IOS13_SDK
     if (@available(iOS 13, *)) {
         return self.searchController.automaticallyShowsCancelButton;
     }
-#endif
 
     return _automaticallyShowsSearchBarCancelButton;
 }
 
 - (void)setAutomaticallyShowsSearchBarCancelButton:(BOOL)value {
-#if FLEX_AT_LEAST_IOS13_SDK
     if (@available(iOS 13, *)) {
         self.searchController.automaticallyShowsCancelButton = value;
     }
-#endif
 
     _automaticallyShowsSearchBarCancelButton = value;
 }
@@ -568,7 +559,7 @@ static UITextField *kDummyTextField = nil;
     [self.debounceTimer invalidate];
     NSString *text = searchController.searchBar.text;
     
-    void (^updateSearchResults)() = ^{
+    void (^updateSearchResults)(void) = ^{
         if (self.searchResultsUpdater) {
             [self.searchResultsUpdater updateSearchResults:text];
         } else {
