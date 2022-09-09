@@ -9,6 +9,7 @@
 #import "FLEXFileBrowserController.h"
 #import "FLEXUtility.h"
 #import "FLEXWebViewController.h"
+#import "FLEXActivityViewController.h"
 #import "FLEXImagePreviewViewController.h"
 #import "FLEXTableListViewController.h"
 #import "FLEXObjectExplorerFactory.h"
@@ -356,8 +357,6 @@ typedef NS_ENUM(NSUInteger, FLEXFileBrowserSortAttribute) {
     // Since our actions are outside of that protocol, we need to manually handle the action forwarding from the cells.
 }
 
-#if FLEX_AT_LEAST_IOS13_SDK
-
 - (UIContextMenuConfiguration *)tableView:(UITableView *)tableView
 contextMenuConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath
                                     point:(CGPoint)point __IOS_AVAILABLE(13.0) {
@@ -394,8 +393,6 @@ contextMenuConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath
         }
     ];
 }
-
-#endif
 
 - (void)openFileController:(NSString *)fullPath {
     UIDocumentInteractionController *controller = [UIDocumentInteractionController new];
@@ -473,10 +470,7 @@ contextMenuConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath
         [self openFileController:pathString];
     } else {
         // Share sheet for files
-        UIActivityViewController *shareSheet = [[UIActivityViewController alloc] initWithActivityItems:@[filePath] applicationActivities:nil];
-        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-            shareSheet.popoverPresentationController.sourceView = sender;
-        }
+        UIViewController *shareSheet = [FLEXActivityViewController sharing:@[filePath] source:sender];
         [self presentViewController:shareSheet animated:true completion:nil];
     }
 }

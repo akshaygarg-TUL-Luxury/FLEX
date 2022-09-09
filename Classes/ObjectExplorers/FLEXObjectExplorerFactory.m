@@ -76,19 +76,33 @@ static NSMutableDictionary<id<NSCopying>, Class> *classesToRegisteredSections = 
     // shortcut section for NSObject.
     //
     // TODO: rename it to FLEXNSObjectShortcuts or something?
-    Class sectionClass = nil;
+    FLEXShortcutsSection *shortcutsSection = [FLEXShortcutsSection forObject:object];
+    NSArray *sections = @[shortcutsSection];
+    
+    Class customSectionClass = nil;
     Class cls = object_getClass(object);
     do {
-        sectionClass = classesToRegisteredSections[(id<NSCopying>)cls];
-    } while (!sectionClass && (cls = [cls superclass]));
+        customSectionClass = classesToRegisteredSections[(id<NSCopying>)cls];
+    } while (!customSectionClass && (cls = [cls superclass]));
 
-    if (!sectionClass) {
-        sectionClass = [FLEXShortcutsSection class];
+    if (customSectionClass) {
+        id customSection = [customSectionClass forObject:object];
+        BOOL isFLEXShortcutSection = [customSection respondsToSelector:@selector(isNewSection)];
+        
+        // If the section "replaces" the default shortcuts section,
+        // only return that section. Otherwise, return both this
+        // section and the default shortcuts section.
+        if (isFLEXShortcutSection && ![customSection isNewSection]) {
+            sections = @[customSection];
+        } else {
+            // Custom section will go before shortcuts
+            sections = @[customSection, shortcutsSection];            
+        }
     }
 
     return [FLEXObjectExplorerViewController
         exploringObject:object
-        customSection:[sectionClass forObject:object]
+        customSections:sections
     ];
 }
 
@@ -166,7 +180,7 @@ static NSMutableDictionary<id<NSCopying>, Class> *classesToRegisteredSections = 
             return [self explorerViewControllerForObject:UIDevice.currentDevice];
         case FLEXGlobalsRowPasteboard:
             return [self explorerViewControllerForObject:UIPasteboard.generalPasteboard];
-            case FLEXGlobalsRowURLSession:
+        case FLEXGlobalsRowURLSession:
             return [self explorerViewControllerForObject:NSURLSession.sharedSession];
         case FLEXGlobalsRowURLCache:
             return [self explorerViewControllerForObject:NSURLCache.sharedURLCache];
@@ -201,8 +215,22 @@ static NSMutableDictionary<id<NSCopying>, Class> *classesToRegisteredSections = 
 
             return nil;
         }
-        default: return nil;
+        
+        case FLEXGlobalsRowNetworkHistory:
+        case FLEXGlobalsRowSystemLog:
+        case FLEXGlobalsRowLiveObjects:
+        case FLEXGlobalsRowAddressInspector:
+        case FLEXGlobalsRowCookies:
+        case FLEXGlobalsRowBrowseRuntime:
+        case FLEXGlobalsRowAppKeychainItems:
+        case FLEXGlobalsRowPushNotifications:
+        case FLEXGlobalsRowBrowseBundle:
+        case FLEXGlobalsRowBrowseContainer:
+        case FLEXGlobalsRowCount:
+            return nil;
     }
+    
+    return nil;
 }
 
 + (FLEXGlobalsEntryRowAction)globalsEntryRowAction:(FLEXGlobalsRow)row {

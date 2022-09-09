@@ -64,8 +64,6 @@
     return kFLEXDefaultCell;
 }
 
-#if FLEX_AT_LEAST_IOS13_SDK
-
 - (NSString *)menuTitleForRow:(NSInteger)row {
     NSString *title = [self titleForRow:row];
     NSString *subtitle = [self menuSubtitleForRow:row];
@@ -81,7 +79,7 @@
     return @"";
 }
 
-- (NSArray<UIMenuElement *> *)menuItemsForRow:(NSInteger)row sender:(UIViewController *)sender API_AVAILABLE(ios(13)) {
+- (NSArray<UIMenuElement *> *)menuItemsForRow:(NSInteger)row sender:(UIViewController *)sender API_AVAILABLE(ios(13.0)) {
     NSArray<NSString *> *copyItems = [self copyMenuItemsForRow:row];
     NSAssert(copyItems.count % 2 == 0, @"copyMenuItemsForRow: should return an even list");
     
@@ -126,8 +124,6 @@
     
     return @[];
 }
-
-#endif
 
 - (NSArray<NSString *> *)copyMenuItemsForRow:(NSInteger)row {
     return nil;
