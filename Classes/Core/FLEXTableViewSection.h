@@ -41,7 +41,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// Subclasses \e may override this as necessary, but are not required to.
 /// See \c FLEXTableView.h for more information.
 /// @return nil by default.
-@property (nonatomic, readonly, nullable, strong) NSDictionary<NSString *, Class> *cellRegistrationMapping;
+@property (nonatomic, readonly, nullable) NSDictionary<NSString *, Class> *cellRegistrationMapping;
 
 /// The section should filter itself based on the contents of this property
 /// as it is set. If it is set to nil or an empty string, it should not filter.
@@ -50,7 +50,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// It is common practice to use two arrays for the underlying model:
 /// One to hold all rows, and one to hold unfiltered rows. When \c setFilterText:
 /// is called, call \c super to store the new value, and re-filter your model accordingly.
-@property (nonatomic, nullable, strong) NSString *filterText;
+@property (nonatomic, nullable) NSString *filterText;
 
 /// Provides an avenue for the section to refresh data or change the number of rows.
 ///
@@ -106,7 +106,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable NSString *)menuTitleForRow:(NSInteger)row API_AVAILABLE(ios(13.0));
 /// Protected, not intended for public use. \c menuTitleForRow:
 /// already includes the value returned from this method.
-/// 
+///
 /// By default, this returns \c @"". Subclasses may override to
 /// provide a detailed description of the target of the context menu.
 - (NSString *)menuSubtitleForRow:(NSInteger)row API_AVAILABLE(ios(13.0));

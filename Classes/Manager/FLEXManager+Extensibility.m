@@ -119,18 +119,22 @@
     [self registerDefaultSimulatorShortcutWithKey:@"f" modifiers:0 action:^{
         [self toggleExplorer];
     } description:@"Toggle FLEX toolbar"];
+
     [self registerDefaultSimulatorShortcutWithKey:@"g" modifiers:0 action:^{
         [self showExplorerIfNeeded];
         [self.explorerViewController toggleMenuTool];
     } description:@"Toggle FLEX globals menu"];
+
     [self registerDefaultSimulatorShortcutWithKey:@"v" modifiers:0 action:^{
         [self showExplorerIfNeeded];
         [self.explorerViewController toggleViewsTool];
     } description:@"Toggle view hierarchy menu"];
+
     [self registerDefaultSimulatorShortcutWithKey:@"s" modifiers:0 action:^{
         [self showExplorerIfNeeded];
         [self.explorerViewController toggleSelectTool];
     } description:@"Toggle select tool"];
+
     [self registerDefaultSimulatorShortcutWithKey:@"m" modifiers:0 action:^{
         [self showExplorerIfNeeded];
         [self.explorerViewController toggleMoveTool];
@@ -145,16 +149,19 @@
             [self tryScrollDown];
         }
     } description:@"Cycle view selection\n\t\tMove view down\n\t\tScroll down"];
+
     [self registerDefaultSimulatorShortcutWithKey:UIKeyInputUpArrow modifiers:0 action:^{
         if (self.isHidden || ![self.explorerViewController handleUpArrowKeyPressed]) {
             [self tryScrollUp];
         }
     } description:@"Cycle view selection\n\t\tMove view up\n\t\tScroll up"];
+
     [self registerDefaultSimulatorShortcutWithKey:UIKeyInputRightArrow modifiers:0 action:^{
         if (!self.isHidden) {
             [self.explorerViewController handleRightArrowKeyPressed];
         }
     } description:@"Move selected view right"];
+
     [self registerDefaultSimulatorShortcutWithKey:UIKeyInputLeftArrow modifiers:0 action:^{
         if (self.isHidden) {
             [self tryGoBack];
